@@ -27,7 +27,8 @@ app.use(helmet());
 app.use(cors());
 
 const uuid = require('uuid/v4');
-app.use(express.json());
+// app.use(express.json());
+
 
 app.use((error, req, res, next) => {
   let response;
@@ -40,6 +41,18 @@ app.use((error, req, res, next) => {
 
   res.status(500).json(response);
 });
+
+//validation middleware
+function validateBearToken(req,res, next) {
+  const apiToken = process.env.SECRET_API_KEY
+  const authToken = req.get('Authorization')
+  if(!authToken || authToken.split(' ')[1] !== apiToken){
+    return res 
+      .status(401).json({ error: 'Unauthorized request '})
+  }
+  next();
+}
+
 
 //this is the address array of objects containing all addresses 
 address = [
@@ -75,13 +88,14 @@ address = [
 ]
 
 
+
 //this is a get request for all address objects in the address array
  app.get('/address', (req, res) => {
   res.json(address);
 })
 
 
- app.post('/address', (req, res) => {
+ app.post('/address', [express.json(), validateBearToken], (req, res) => {
   
   //deconstructing all keys from req.body objects in address array
   const { firstName,lastName, address1 , address2, city, state, zip } = req.body;
@@ -114,7 +128,7 @@ address = [
   if(state.length !== 2){
     return res
     .status(400)
-    .send("State needs to be at least 2 Characters");
+    .send("State must be 2 Characters");
   }
   if(!zip){
     return res
@@ -149,12 +163,10 @@ address = [
     .status(201)
     .location(`http://localhost:8000/address/${id}`)
     .json(newAddress);
-
-  res.send("Added New Address");
 });
 
 
-app.delete('/address/:addressId', (req, res) => {
+app.delete('/address/:addressId', validateBearToken, (req, res) => {
   const { addressId } = req.params;
 
   //find the index of the address in the array
@@ -166,8 +178,8 @@ app.delete('/address/:addressId', (req, res) => {
       .status(404)
       .send('Address not found');
   }
-  //remove that address
-  address.slice(index, 1)
+  //remove that address with splice (not slice!)
+  address.splice(index, 1)
 
   //we don't need a response body, just a status to say all is well
   //204 no content is acceptable feedback
